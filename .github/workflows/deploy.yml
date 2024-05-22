@@ -1,0 +1,46 @@
+name: Deploy EC2 Instance
+
+on:
+  push:
+    branches:
+      - feature/ui
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_wrapper: false
+
+
+      - name: Initialize Terraform
+        run: terraform init -backend-config="bucket=$TF_STATE_BUCKET_NAME" -backend-config="region=us-west-2"
+        working-directory: ./terraform
+
+      - name: Plan Terraform
+        run: terraform plan \
+             -var="region=us-west-2" \
+             -var="public_key=$PUBLIC_SSH_KEY" \
+             -var="private_key=$PRIVATE_SSH_KEY" \
+             -var="key_name=deployer-key" \
+             -out=PLAN
+        working-directory: ./terraform
+        id: plan
+
+      - name: Apply Terraform
+        id: apply
+        run: terraform apply -auto-approve PLAN
+        working-directory: ./terraform
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  PRIVATE_SSH_KEY: ${{ secrets.AWS_SSH_KEY_PRIVATE }}
+  PUBLIC_SSH_KEY: ${{ secrets.AWS_SSH_KEY_PUBLIC }}
